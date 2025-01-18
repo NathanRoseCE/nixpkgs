@@ -18,13 +18,15 @@ let
       throw "Verbatim CNI-config and CNI configDir cannot both be set."
     else if cfg.cni.configDir != null then
       cfg.cni.configDir
-    else
+    else if cfg.cni.config != [ ] then
       (pkgs.buildEnv {
         name = "kubernetes-cni-config";
         paths = imap (
           i: entry: pkgs.writeTextDir "${toString (10 + i)}-${entry.type}.conf" (builtins.toJSON entry)
         ) cfg.cni.config;
-      });
+      })
+    else
+      null;
 
   infraContainer = pkgs.dockerTools.buildImage {
     name = "pause";
@@ -313,7 +315,9 @@ in
   config = mkMerge [
     (mkIf cfg.enable {
 
-      environment.etc."cni/net.d".source = cniConfig;
+      environment.etc = lib.optionalAttrs (cniConfig != null) {
+        "cni/net.d".source = cniConfig;
+      };
 
       services.kubernetes.kubelet.seedDockerImages = [ infraContainer ];
 
